@@ -1,0 +1,14 @@
+# Ignore local audit assets
+test.bin
+
+# Ignore CMake build directories
+/build/
+/out/
+.cmake/
+CMakeUserPresets.json
+
+# Ignore MSVC compiler specific files
+.vs/
+x64/
+Debug/
+Release/
