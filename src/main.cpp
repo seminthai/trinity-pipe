@@ -10,67 +10,55 @@
 enum Trit : uint8_t { TRIT_0 = 0, TRIT_1 = 1, TRIT_Z = 2 };
 
 struct EncodedResult {
-    Trit trits[4];
+    Trit trits[5];
     uint8_t length;
 };
 
 const EncodedResult ENCODER_LUT[16] = {
-    { {TRIT_Z, TRIT_0, TRIT_0, TRIT_0}, 1 },
-    { {TRIT_0, TRIT_Z, TRIT_0, TRIT_0}, 2 },
-    { {TRIT_1, TRIT_Z, TRIT_0, TRIT_0}, 2 },
-    { {TRIT_0, TRIT_0, TRIT_Z, TRIT_0}, 3 },
-    { {TRIT_0, TRIT_1, TRIT_Z, TRIT_0}, 3 },
-    { {TRIT_1, TRIT_0, TRIT_Z, TRIT_0}, 3 },
-    { {TRIT_1, TRIT_1, TRIT_Z, TRIT_0}, 3 },
-    { {TRIT_0, TRIT_0, TRIT_0, TRIT_Z}, 4 },
-    { {TRIT_0, TRIT_0, TRIT_1, TRIT_Z}, 4 },
-    { {TRIT_0, TRIT_1, TRIT_0, TRIT_Z}, 4 },
-    { {TRIT_0, TRIT_1, TRIT_1, TRIT_Z}, 4 },
-    { {TRIT_1, TRIT_0, TRIT_0, TRIT_Z}, 4 },
-    { {TRIT_1, TRIT_0, TRIT_1, TRIT_Z}, 4 },
-    { {TRIT_1, TRIT_1, TRIT_0, TRIT_Z}, 4 },
-    { {TRIT_1, TRIT_1, TRIT_1, TRIT_0}, 4 },
-    { {TRIT_1, TRIT_1, TRIT_1, TRIT_1}, 4 }
+    { {TRIT_Z, TRIT_0, TRIT_0, TRIT_0, TRIT_0}, 1 }, // 0
+    { {TRIT_0, TRIT_Z, TRIT_0, TRIT_0, TRIT_0}, 2 }, // 1
+    { {TRIT_1, TRIT_Z, TRIT_0, TRIT_0, TRIT_0}, 2 }, // 2
+    { {TRIT_0, TRIT_0, TRIT_Z, TRIT_0, TRIT_0}, 3 }, // 3
+    { {TRIT_0, TRIT_1, TRIT_Z, TRIT_0, TRIT_0}, 3 }, // 4 
+    { {TRIT_1, TRIT_0, TRIT_Z, TRIT_0, TRIT_0}, 3 }, // 5
+    { {TRIT_1, TRIT_1, TRIT_Z, TRIT_0, TRIT_0}, 3 }, // 6
+    { {TRIT_0, TRIT_0, TRIT_0, TRIT_Z, TRIT_0}, 4 }, // 7
+    { {TRIT_0, TRIT_0, TRIT_1, TRIT_Z, TRIT_0}, 4 }, // 8
+    { {TRIT_0, TRIT_1, TRIT_0, TRIT_Z, TRIT_0}, 4 }, // 9
+    { {TRIT_0, TRIT_1, TRIT_1, TRIT_Z, TRIT_0}, 4 }, // 10
+    { {TRIT_1, TRIT_0, TRIT_0, TRIT_Z, TRIT_0}, 4 }, // 11
+    { {TRIT_1, TRIT_0, TRIT_1, TRIT_Z, TRIT_0}, 4 }, // 12
+    { {TRIT_1, TRIT_1, TRIT_0, TRIT_Z, TRIT_0}, 4 }, // 13
+    { {TRIT_1, TRIT_1, TRIT_1, TRIT_Z, TRIT_0}, 4 }, // 14
+    { {TRIT_0, TRIT_0, TRIT_0, TRIT_0, TRIT_Z}, 5 }  // 15 
 };
 
 inline std::pair<uint8_t, uint8_t> HardwareDecode(const Trit* pipe, size_t index) {
-    Trit t0 = pipe[index];
-    if (t0 == TRIT_Z) return { 0, 1 };
+    uint8_t bitCount = 0;
+    uint8_t pattern = 0;
 
-    Trit t1 = pipe[index + 1];
-    if (t1 == TRIT_Z) return { (t0 == TRIT_1) ? uint8_t(2) : uint8_t(1), 2 };
-
-    Trit t2 = pipe[index + 2];
-    if (t2 == TRIT_Z) {
-        uint8_t val = (t0 == TRIT_1) ? 5 : 3;
-        if (t1 == TRIT_1) val++;
-        return { val, 3 };
+    while (pipe[index + bitCount] != TRIT_Z) {
+        pattern = (pattern << 1) | static_cast<uint8_t>(pipe[index + bitCount]);
+        bitCount++;
     }
 
-    Trit t3 = pipe[index + 3];
-    if (t3 == TRIT_Z) {
-        if (t0 == TRIT_0 && t1 == TRIT_0 && t2 == TRIT_0) return { 7, 4 };
-        if (t0 == TRIT_0 && t1 == TRIT_0 && t2 == TRIT_1) return { 8, 4 };
-        if (t0 == TRIT_0 && t1 == TRIT_1 && t2 == TRIT_0) return { 9, 4 };
-        if (t0 == TRIT_0 && t1 == TRIT_1 && t2 == TRIT_1) return { 10, 4 };
-        if (t0 == TRIT_1 && t1 == TRIT_0 && t2 == TRIT_0) return { 11, 4 };
-        if (t0 == TRIT_1 && t1 == TRIT_0 && t2 == TRIT_1) return { 12, 4 };
-        if (t0 == TRIT_1 && t1 == TRIT_1 && t2 == TRIT_0) return { 13, 4 };
+    uint8_t totalLength = bitCount + 1; 
+
+    switch (bitCount) {
+        case 0: return { 0, totalLength }; // [Z]
+        case 1: return { (pattern == 1) ? uint8_t(2) : uint8_t(1), totalLength }; // [0Z]=1, [1Z]=2
+        case 2: return { static_cast<uint8_t>(3 + pattern), totalLength }; // [00Z]=3, [01Z]=4, [10Z]=5, [11Z]=6
+        case 3: return { static_cast<uint8_t>(7 + pattern), totalLength }; // [000Z]=7 ... [111Z]=14
+        case 4: return { 15, totalLength }; // [0000Z]=15
+        default: return { 0, totalLength }; //
     }
-    
-    return { (t3 == TRIT_1) ? uint8_t(15) : uint8_t(14), 4 };
 }
 
 int main() {
-
     std::ifstream inFile("test.bin", std::ios::binary);
     if (!inFile) {
         std::cout << "====================================================================\n";
         std::cout << "  VALIDATION STAND NOTICE: 'test.bin' not found.\n";
-        std::cout << "  To run the independent audit pipeline:\n";
-        std::cout << "  1. Drop ANY binary file (RAR, WAV, MP3, EXE) into this folder.\n";
-        std::cout << "  2. Rename it explicitly to 'test.bin'.\n";
-        std::cout << "  3. Re-run the executable to evaluate dynamic ternary conversion.\n";
         std::cout << "====================================================================\n";
         return 1;
     }
@@ -91,7 +79,7 @@ int main() {
     }
 
     std::vector<Trit> trinityPipe;
-    trinityPipe.reserve(inputNibbles.size() * 4 + 16);
+    trinityPipe.reserve(inputNibbles.size() * 5 + 32);
     
     size_t zTritCount = 0;
     size_t zeroTritCount = 0;
@@ -108,7 +96,7 @@ int main() {
     }
     
     size_t endTarget = trinityPipe.size(); 
-    for (int i = 0; i < 16; ++i) {
+    for (int i = 0; i < 32; ++i) {
         trinityPipe.push_back(TRIT_0);
     }
 
@@ -172,10 +160,6 @@ int main() {
     std::cout << "                     Estimated I/O Power Saving: -" << powerSavingRatio << " % Watt\n";
     std::cout << "--------------------------------------------------------------------\n";
     std::cout << "  [PERFORMANCE]      Emulated Core Speed    : " << speedMBs << " MB/s\n";
-    std::cout << "====================================================================\n";
-    std::cout << " VERDICT: Bypassing classical binary transmission layout bounds verified.\n";
-    std::cout << " Dynamic data stream transformation inside the physical pipe confirmed.\n";
-    std::cout << " ZERO CHEATS DETECTED: Standard C-string memory comparison evaluation passed.\n";
     std::cout << "====================================================================\n";
 
     return 0;
