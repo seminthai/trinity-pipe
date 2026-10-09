@@ -38,6 +38,20 @@ When validated against maximum-entropy blocks where classical static compression
 
 ---
 
+## 🔍 Hardware Emulation Artifacts vs. Production Silicon
+
+Since this repository serves as a **hardware emulation model** rather than a software-level codec, certain algorithmic implementations deliberately mirror physical silicon behavior rather than defensive C++ programming standards:
+
+1. **Unbounded Streaming `while`-loop (Lack of Vector Boundary Checks):** 
+   In `HardwareDecode`, the decoder scans forward sequentially until it strikes a physical `TRIT_Z` marker. In software, an corrupted or malformed stream lacking a `TRIT_Z` would cause an out-of-bounds memory read (Segmentation Fault). 
+   * *The Emulation Fix:* A safety software padding/sentinel buffer of 32 `TRIT_0` elements is appended to the RAM vector to prevent stalls during verification.
+   * *The Silicon Reality:* Physical wires have no concept of "vector boundaries." On an FPGA/ASIC chip, if a `TRIT_Z` is missed due to extreme line noise, the hardware counter simply keeps incrementing. In production silicon, this is handled by a trivial hardware watchdog (e.g., an `if (bit_count > 4) -> raise FRAME_ERROR` condition) which resets the bus state machine asynchronously.
+2. **Speed Evaluation Loop Overwrites (`RUN_PASSES` Cache Warping):**
+   The verification stand executes the entire pipeline 5 times to benchmark emulated processing speed, continuously overwriting the pre-allocated `restoredNibbles` buffer. 
+   * While this prevents dynamic allocation overhead, it triggers severe CPU L1/L2 cache warping. Subsequent passes run significantly faster because the data resides entirely within the processor core cache rather than cold RAM. This artificial boost reflects idealized, ultra-low-latency on-chip bus execution rather than standard OS memory management.
+
+---
+
 ## ⚠️ Legal Status & Commercial Restrictions (Dual-Licensing)
 
 The source code in this repository is published under the **GNU GPLv3** license and is open exclusively for non-commercial use, academic research, and public independent auditing.
