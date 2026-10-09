@@ -1,33 +1,32 @@
 # Trinity Dynamic Channel Pipe Algorithm
 ### Proof-of-Concept Specification: Real-Time Ternary Framing via Physical High-Z Logic
 
-This repository contains the software emulation model and verification stand for the **Trinity Pipe** architecture—a physical layer protocol designed to bypass classical binary static entropy constraints and optimize Input/Output (I/O) interface power consumption.
+This repository contains the software emulation model and verification stand for the **Trinity Pipe** architecture—a physical layer (PHY) protocol designed to optimize Input/Output (I/O) interface bandwidth and power consumption by shifting framing logic from software/link layers directly to physical silicon hardware.
 
-The project emulates data stream translation through a ternary transmission medium utilizing a **physical third logical state—High Impedance (`TRIT_Z`)**.
+The project emulates data stream translation through a ternary transmission medium utilizing a **physical third logical state—High Impedance (`TRIT_Z`)** as a strict, asymmetric frame delimiter.
 
 ---
 
 ## 🧠 Technical Overview & Mathematical Foundation
 
-The Trinity Pipe architecture completely eliminates the requirement for conventional link and network layer framing overheads (packet headers and software stream boundary markers):
+The Trinity Pipe architecture completely eliminates the requirement for conventional link and network layer framing overheads (such as packet headers, start/stop bits, and software stream boundary markers):
 
-1. **Physical Framing:** Data block separation is shifted entirely to the silicon hardware level. The frame boundary is encoded by transitioning the physical transmission line into a High-Z state. For the receiving state machine, this physical transition acts as an instantaneous hardware trigger to terminate the sequence.
-2. **Ternary Prefix Tree Structure (LUT):** The input binary stream is segmented into 4-bit nibbles (range 0..15) and mapped at runtime onto the ternary alphabet (`0`, `1`, `Z`) using a fixed lookup table layout:
-   * **Minimum Length (1 Trit):** The value `0` is translated as a single `TRIT_Z` token (the transmission line immediately goes quiet).
-   * **Intermediate Lengths (2-3 Trits):** High-frequency and mid-frequency states are encoded into combinations terminated by a mandatory `TRIT_Z` trit (e.g., `0Z`, `1Z`, `00Z`).
-   * **Maximum Length (4 Trits / Worst-Case Scenario):** The lowest frequency states (14 and 15) are translated as fixed 4-bit combinations `1110` and `1111` **without using a terminal `TRIT_Z` token**.
-
-   *Mathematical Proof of Zero Data Overhead:* Omitting the `TRIT_Z` token at the maximum depth of the tree guarantees that in the worst-case data distribution scenario, the ternary stream volume is exactly equivalent to the original binary layout (8 trits per 2 nibbles / 1 byte). The algorithm is physically protected against inflation and runtime stream dilation.
-3. **Symbolic Determinism (Zero Look-ahead):** The `HardwareDecode` function simulates the parallel logic of transistor gates on an FPGA/ASIC. Decoding is executed on a per-trit basis in real time. The algorithm requires zero look-ahead buffering or packet accumulation, maintaining a constant transmission delay at a single clock cycle level (Ultra-low Latency).
+1. **Strict Physical Framing (Z-Marker):** Data block separation is handled entirely at the hardware level. Every token mapped into the pipe is strictly terminated by a High-Z state (`TRIT_Z`). For the receiving state machine, the transition of the physical conductor into High-Z acts as an instantaneous, zero-latency, edge-triggered interrupt to finalize the current sequence, evaluate its length, and reset the internal bit counter.
+2. **Ternary Prefix-Free Token Mapping (LUT):** The input binary stream is split into 4-bit nibbles (range 0..15) and mapped onto the ternary alphabet (`0`, `1`, `Z`) using a strict marker layout. The number of binary bits (`0` and `1`) transmitted before the line goes quiet (`Z`) uniquely determines the target value:
+   * **Zero-Bit Stream (1 Trit):** The value `0` immediately triggers `TRIT_Z` (the line instantly goes quiet, consuming 1 clock cycle).
+   * **1-Bit to 3-Bit Streams (2-4 Trits):** Values 1 to 14 are transmitted as pure binary combinations immediately cut off by a mandatory terminal `TRIT_Z` token (e.g., `0Z`, `1Z`, `00Z`, ..., `111Z`).
+   * **4-Bit Stream (5 Trits / Worst-Case Compensation):** The lowest frequency state (15) is translated as `0000Z`. While this single state introduces a 5-tact dilation (+25% overhead for a single nibble), it is mathematically compensated for by the ultra-short 1-tact and 2-tact sequences (`0`, `1`, `2`) at the opposite end of the distribution tree.
+3. **Symbolic Determinism (Absolute Zero Look-ahead):** The `HardwareDecode` architecture processes incoming trits sequentially in true real-time. Because `TRIT_Z` acts as an absolute physical wall between data packets, the decoder requires zero look-ahead buffering, packet accumulation, or sliding window tracking. The logic is optimized for direct FPGA/ASIC implementation, requiring only a basic 3-bit counter and an asynchronous High-Z detector.
+4. **Fault Isolation & Self-Synchronization:** In contrast to look-ahead window decoders, the strict marker topology isolates line noise. If a physical glitch corrupts bits inside the pipe, the error is strictly confined to the current nibble. The arrival of the very next physical `TRIT_Z` marker instantly resets the receiver hardware, guaranteeing immediate re-synchronization.
 
 ---
 
-## 📈 System Efficiency Constants (High-Entropy Profile)
+## 📈 System Efficiency Constants (High-Entropy RAR Profile)
 
-When validated against high-entropy blocks where classical static compression tools fail (highly compressed archives, dense media streams), the Trinity Pipe architecture demonstrates consistent performance baselines:
-* **`Dynamic Data Reduction` (Channel Capacity Saving):** **16.5% – 18.5%** achieved inherently via alphabet optimization.
-* **`Virtual Throughput Gain` (Bandwidth Expansion):** **+19.8% – 27.7%** effective bandwidth boost across the physical conductor relative to the source clock frequency.
-* **`Green Tech / Power Saving` (Energy Efficiency):** **25.1% – 27.1%**. Because the High-Impedance state physically disconnects the transmitter from the line (reducing the active current loop to zero), the I/O interface sub-components rest for a quarter of the total transmission time, proportionally dropping heat dissipation and overall interface power requirements.
+When validated against maximum-entropy blocks where classical static compression tools reach their absolute mathematical limits (highly compressed RAR/7z archives, encrypted payloads, dense media streams), the Trinity Pipe architecture maintains rock-solid physical baselines:
+* **`Dynamic Data Reduction` (Time/Tact Saving):** **~15.6%** physical channel compaction inherently achieved via asymmetric symbol distribution.
+* **`Virtual Throughput Gain` (Effective Bandwidth Boost):** **+18.5%** effective bandwidth expansion across the physical conductor relative to the base source clock frequency.
+* **`Green Tech / Power Saving` (Energy Efficiency):** **~29.6%**. Because the High-Impedance state physically disconnects the driver from the transmission line (dropping the active current loop to zero), the I/O interface sub-components rest for nearly a third of the total transmission time, proportionally lowering thermal dissipation and line drive power.
 
 ---
 
@@ -35,8 +34,7 @@ When validated against high-entropy blocks where classical static compression to
 
 * **Cross-Platform Compatibility:** Project compilation is fully standardized via `CMakeLists.txt` (requires a compiler supporting the **C++17** standard).
 * **Evaluation Assets:** The emulation stand works out-of-the-box. To initialize the validation pipeline, place **ANY** raw binary file into the root build directory and rename it explicitly to **`test.bin`**.
-* **Hardware Accelerations:** To trigger compiler-level vector instruction optimizations (**AVX2**), building and running the executable must be strictly performed in the **`Release`** configuration.
-* **Emulation Model Limitations:** The current software evaluation stand stores trits uncompressed in RAM (1 byte of RAM per 1 trit) for granular auditing transparency. Consequently, the input target `test.bin` volume **should not exceed 50–100 MB** to avoid physical memory exhaustion and allocation stalls. This software-specific bottleneck is entirely absent on real physical hardware controllers (FPGA/ASIC).
+* **Hardware Accelerations:** To trigger compiler-level vector instruction optimizations, building and running the executable must be performed in the **`Release`** configuration.
 
 ---
 
